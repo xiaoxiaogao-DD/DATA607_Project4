@@ -1,0 +1,97 @@
+#MSDS Spring 2018 
+##DATA 607 Data Aquisition and Management
+####Jiadi Li
+####Project 4: Document Classification
+
+**Build a spam/ham(non-spam) email dataset, then predict the class of new documents withheld from the training dataset**  
+Source of dataset: https://spamassassin.apache.org/publiccorpus/  
+
+**0)Import libraries**
+```{r}
+library(tm) #Text mining package: a framework for text mining application within R
+library(RTextTools) #A machine learning package for automatic text classification
+```
+
+**1)Import dataset**  
+
+The spam/ham email sources:  
+20021010_easy_ham.tar.bz2  
+20021010_spam.tar.bz2  
+20030228_spam.tar.bz2  
+20050311_spam_2.tar.bz2  
+
+unzip all files twice and enter the directory of both folders  
+
+Build two text corpus (large and structured set of texts for statistical analysis):  
+```{r}
+easy_ham <- VCorpus(DirSource('C:\\Users\\Asus-pc\\Downloads\\Spam_Ham\\20021010_easy_ham\\easy_ham'))
+
+for (i in 1:length(easy_ham)) {#add a label for each email to identify if it's spam or ham
+  meta(easy_ham[[i]],'class') <- 0
+}
+
+spam <- VCorpus(DirSource('C:\\Users\\Asus-pc\\Downloads\\Spam_Ham\\20021010_spam\\spam'))
+
+for (i in 1:length(spam)) {
+  meta(spam[[i]],'class') <- 1
+}
+
+easy_ham
+
+spam
+```
+
+**2)Clean and tidy data**  
+```{r}
+easy_ham <- tm_map(easy_ham,content_transformer(tolower)) #set all letters to lowercase
+easy_ham <- tm_map(easy_ham,removeNumbers) #remove all numbers
+easy_ham <- tm_map(easy_ham,stripWhitespace) #remove all white spaces
+easy_ham <- tm_map(easy_ham,content_transformer(removePunctuation)) #remove punctuation
+easy_ham <- tm_map(easy_ham,removeWords,stopwords('english')) #remove stopwords
+easy_ham <- tm_map(easy_ham,content_transformer(function(x) iconv(x,from='UTF-8',sub='byte'))) #convert special characters to byte
+
+spam <- tm_map(spam,content_transformer(tolower))
+spam <- tm_map(spam,removeNumbers)
+spam <- tm_map(spam,stripWhitespace)
+spam <- tm_map(spam,content_transformer(removePunctuation))
+spam <- tm_map(spam,removeWords,stopwords('english'))
+spam <- tm_map(spam,content_transformer(function(x) iconv(x,from='UTF-8',sub='byte')))
+```
+
+**3)Preparation for Analysis**  
+
+combine both datasets into one  
+```{r}
+dataset <- c(spam[1:300],easy_ham[501:1000],spam[301:1500],easy_ham[1:500],spam[1501:2034],easy_ham[1001:2500],spam[2035:2398],easy_ham[2501:2551])
+```
+
+Transform the dataset into document term matrix  
+(A document-term matrix or term-document matrix is a methematical matrix that describes the frequency of terms that occur in a collection of documents. In a document-term matrix, rows correspond to documents in the collection and columns correspond to terms.)   
+```{r} 
+dataset_dtm <- DocumentTermMatrix(dataset)
+dataset_dtm
+```
+
+separate into training and test data  
+```{r}
+class <- as.vector(unlist(meta(dataset,type='local',tag='class')))
+len <- length(dataset)
+
+container <- create_container(dataset_dtm,labels = class,trainSize = 1:3960,testSize = 3961:4949,virgin = FALSE)
+```
+
+**4)Analysis**  
+
+The machine learning algorithm chosen is Support vector machine.  
+It's an supervised learning model with associated learning algorithms that analyze data used for classification and regression analysis.  
+```{r}
+model <- train_model(container,'SVM')
+result <- classify_model(container,model)
+head(result)
+
+prop.table(table(result[,1] == class[3961:len]))
+```
+
+**5)Conclusion**
+
+The Support Vector Machine algorithm is performing pretty well.  
